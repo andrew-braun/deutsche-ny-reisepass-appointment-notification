@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+
+# Environment
+.env
+
+# Debug output
+screenshots/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+
+
+.ai/

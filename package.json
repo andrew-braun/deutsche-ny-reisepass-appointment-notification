@@ -1,0 +1,19 @@
+{
+  "name": "consulate-checker",
+  "version": "1.0.0",
+  "description": "German Consulate NYC appointment availability checker",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "test:notify": "node src/test-notify.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.26.0",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.71.2",
+    "dotenv": "^17.2.3",
+    "playwright": "^1.57.0"
+  }
+}
