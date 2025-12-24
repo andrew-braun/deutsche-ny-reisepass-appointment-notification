@@ -7,6 +7,7 @@
     "start": "node src/index.js",
     "test:notify": "node src/test-notify.js",
     "test:captcha": "node src/test-captcha.js",
+    "test:checker": "node src/test-checker.js",
     "capture:captcha": "node src/capture-captcha.js"
   },
   "keywords": [],
