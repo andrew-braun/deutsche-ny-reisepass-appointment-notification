@@ -55,6 +55,7 @@ export async function solveCaptchaCapSolver(imageBase64, options = {}) {
 
 		// CapSolver returns results directly in the createTask response
 		if (data.status === "ready" && data.solution?.text) {
+			console.info("Solved captcha with solution: ", data.solution.text)
 			return data.solution.text
 		}
 

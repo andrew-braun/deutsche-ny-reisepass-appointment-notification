@@ -1,6 +1,6 @@
+import dotenv from "dotenv"
 import { chromium } from "playwright"
 import { solveCaptchaCapSolver } from "./captcha-solver-capsolver.js"
-import dotenv from "dotenv"
 
 dotenv.config()
 
@@ -29,7 +29,9 @@ export async function checkAppointments() {
 
 		// Step 2: Check for and solve captcha if present
 		// Captcha is in a div with background-image containing base64 data
-		const captchaPresent = await page.locator('div[style*="background"][style*="data:image"]').count()
+		const captchaPresent = await page
+			.locator('div[style*="background"][style*="data:image"]')
+			.count()
 
 		if (captchaPresent > 0) {
 			if (DEBUG) {
@@ -65,7 +67,9 @@ export async function checkAppointments() {
 		}
 
 		if (DEBUG) {
-			console.log("[DEBUG] No appointments in current month, checking next month...")
+			console.log(
+				"[DEBUG] No appointments in current month, checking next month..."
+			)
 		}
 
 		// Step 4: Click "next month" button and check again
@@ -111,55 +115,112 @@ export async function checkAppointments() {
  * @private
  */
 async function solveCaptchaAndSubmit(page) {
-	// The captcha image is in a div with background-image style
-	// Find the div that contains the captcha (has a long ID and background-image with base64 data)
-	const captchaDiv = page.locator('div[style*="background"][style*="data:image"]').first()
+	const maxRetries = 3
 
-	if (DEBUG) {
-		console.log("[DEBUG] Found captcha div, taking screenshot...")
-	}
+	for (let attempt = 1; attempt <= maxRetries; attempt++) {
+		if (DEBUG) {
+			console.log(`[DEBUG] Captcha attempt ${attempt}/${maxRetries}`)
+		}
 
-	// Get the image as base64 by taking a screenshot of the div
-	const imageBuffer = await captchaDiv.screenshot()
-	const imageBase64 = imageBuffer.toString("base64")
+		// The captcha image is in a div with background-image style
+		// Find the div that contains the captcha (has a long ID and background-image with base64 data)
+		const captchaDiv = page
+			.locator('div[style*="background"][style*="data:image"]')
+			.first()
 
-	if (DEBUG) {
-		console.log("[DEBUG] Captcha image extracted, sending to CapSolver...")
-	}
+		// Wait for the captcha div to be visible
+		await captchaDiv.waitFor({ state: "visible", timeout: 10000 })
 
-	// Solve the captcha
-	const captchaText = await solveCaptchaCapSolver(imageBase64, {
-		module: "module_005",
-	})
+		if (DEBUG) {
+			console.log(
+				"[DEBUG] Found captcha div, extracting base64 from style attribute..."
+			)
+		}
 
-	if (DEBUG) {
-		console.log(`[DEBUG] Captcha solved: "${captchaText}"`)
-	}
+		// Extract the base64 image directly from the style attribute
+		const styleAttr = await captchaDiv.getAttribute("style")
 
-	// Find the captcha input field by name
-	const captchaInput = page.locator('input[name="captchaText"]')
+		// Parse the base64 data from the background-image URL
+		// Format: background: ... url('data:image/jpg;base64,/9j/4AAQ...')
+		const base64Match = styleAttr.match(/data:image\/[^;]+;base64,([^')]+)/)
 
-	// Fill in the captcha
-	await captchaInput.fill(captchaText)
+		if (!base64Match || !base64Match[1]) {
+			throw new Error("Could not extract base64 image from captcha div")
+		}
 
-	if (DEBUG) {
-		console.log("[DEBUG] Captcha text entered, clicking Continue button...")
-	}
+		const imageBase64 = base64Match[1]
 
-	// Click the "Continue" button (id="appointment_captcha_month_appointment_showMonth")
-	const continueButton = page.locator('#appointment_captcha_month_appointment_showMonth')
+		if (DEBUG) {
+			console.log(
+				`[DEBUG] Extracted base64 image (${imageBase64.length} chars)`
+			)
+		}
 
-	await continueButton.click()
+		if (DEBUG) {
+			console.log("[DEBUG] Captcha image extracted, sending to CapSolver...")
+		}
 
-	if (DEBUG) {
-		console.log("[DEBUG] Continue button clicked, waiting for navigation...")
-	}
+		// Solve the captcha
+		const captchaText = await solveCaptchaCapSolver(imageBase64, {
+			module: "module_005",
+		})
 
-	// Wait for navigation after submitting captcha
-	await page.waitForLoadState("networkidle")
+		if (DEBUG) {
+			console.log(`[DEBUG] Captcha solved: "${captchaText}"`)
+		}
 
-	if (DEBUG) {
-		console.log("[DEBUG] Captcha submitted successfully")
+		// Find the captcha input field by name
+		const captchaInput = page.locator('input[name="captchaText"]')
+
+		// Clear any existing text and fill in the captcha
+		await captchaInput.clear()
+		await captchaInput.fill(captchaText)
+
+		// Wait a moment to ensure the text is filled
+		await page.waitForTimeout(500)
+
+		if (DEBUG) {
+			const filledValue = await captchaInput.inputValue()
+			console.log(`[DEBUG] Captcha text entered: "${filledValue}"`)
+			console.log("[DEBUG] Clicking Continue button...")
+		}
+
+		// Click the "Continue" button (id="appointment_captcha_month_appointment_showMonth")
+		const continueButton = page.locator(
+			"#appointment_captcha_month_appointment_showMonth"
+		)
+
+		await continueButton.click()
+
+		if (DEBUG) {
+			console.log("[DEBUG] Continue button clicked, waiting for navigation...")
+		}
+
+		// Wait for navigation after submitting captcha
+		await page.waitForLoadState("networkidle")
+
+		// Check if we're still on the captcha page (indicates failure)
+		const stillOnCaptchaPage =
+			(await page.locator('input[name="captchaText"]').count()) > 0
+
+		if (stillOnCaptchaPage) {
+			if (DEBUG) {
+				console.log("[DEBUG] Captcha was incorrect, retrying...")
+			}
+
+			if (attempt === maxRetries) {
+				throw new Error(`Failed to solve captcha after ${maxRetries} attempts`)
+			}
+
+			// Continue to next iteration to retry
+			continue
+		}
+
+		// Successfully passed captcha
+		if (DEBUG) {
+			console.log("[DEBUG] Captcha submitted successfully!")
+		}
+		return
 	}
 }
 
@@ -169,6 +230,17 @@ async function solveCaptchaAndSubmit(page) {
  * @returns {Promise<boolean>} true if appointments are available
  */
 async function checkPageForAvailability(page) {
+	// First, verify we're not still on the captcha page
+	const onCaptchaPage =
+		(await page.locator('input[name="captchaText"]').count()) > 0
+
+	if (onCaptchaPage) {
+		if (DEBUG) {
+			console.log("[DEBUG] Still on captcha page - something went wrong")
+		}
+		throw new Error("Still on captcha page after submission")
+	}
+
 	// Look for the H2 element with the "no appointments" message
 	const noAppointmentsH2 = page.locator(
 		'h2:has-text("Unfortunately, there are no appointments available")'
@@ -176,12 +248,25 @@ async function checkPageForAvailability(page) {
 
 	const count = await noAppointmentsH2.count()
 
+	// Verify we're on the appointments page by checking for month navigation
+	const onAppointmentsPage =
+		(await page.locator('img[src="images/go-next.gif"]').count()) > 0
+
+	if (!onAppointmentsPage) {
+		if (DEBUG) {
+			console.log("[DEBUG] Not on appointments page - unexpected page state")
+		}
+		throw new Error("Not on expected appointments page")
+	}
+
 	// If the H2 is NOT found, appointments might be available
 	const available = count === 0
 
 	if (DEBUG) {
 		console.log(
-			`[DEBUG] Availability check: ${available ? "AVAILABLE" : "NOT AVAILABLE"} (no-appointments h2 count: ${count})`
+			`[DEBUG] Availability check: ${
+				available ? "AVAILABLE" : "NOT AVAILABLE"
+			} (no-appointments h2 count: ${count})`
 		)
 	}
 
@@ -196,7 +281,9 @@ async function checkPageForAvailability(page) {
 async function checkNextMonth(page) {
 	// Find the "next month" navigation button
 	// It's an <a> tag containing an <img src="images/go-next.gif"/>
-	const nextMonthLink = page.locator('a img[src="images/go-next.gif"]').locator('..')
+	const nextMonthLink = page
+		.locator('a img[src="images/go-next.gif"]')
+		.locator("..")
 
 	if ((await nextMonthLink.count()) === 0) {
 		if (DEBUG) {
