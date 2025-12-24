@@ -16,14 +16,20 @@ export async function checkAppointments() {
 	const browser = await chromium.launch({
 		headless: HEADLESS,
 		args: [
-			"--disable-blink-features=AutomationControlled", // Hide automation
+			"--disable-blink-features=AutomationControlled",
 			"--no-sandbox",
 			"--disable-setuid-sandbox",
+			"--disable-dev-shm-usage", // Helps with Docker/container environments
+			"--disable-gpu",
+			"--disable-software-rasterizer",
 		],
 	})
 
 	try {
 		const page = await browser.newPage()
+
+		// Set viewport
+		await page.setViewportSize({ width: 1280, height: 720 })
 
 		// Set a realistic user agent
 		await page.setExtraHTTPHeaders({
@@ -39,19 +45,55 @@ export async function checkAppointments() {
 			})
 		})
 
+		// Debug: Log network requests and responses
+		if (DEBUG) {
+			page.on("request", (request) => {
+				console.log(`[DEBUG] Request: ${request.method()} ${request.url()}`)
+			})
+			page.on("response", (response) => {
+				console.log(
+					`[DEBUG] Response: ${response.status()} ${response.url()}`
+				)
+			})
+			page.on("requestfailed", (request) => {
+				console.log(
+					`[DEBUG] Request failed: ${request.url()} - ${request.failure()?.errorText}`
+				)
+			})
+		}
+
 		if (DEBUG) {
 			console.log(`[DEBUG] Navigating to: ${APPOINTMENT_URL}`)
 		}
 
 		// Step 1: Navigate to the appointment page
 		// Use 'domcontentloaded' instead of 'networkidle' for better reliability
-		await page.goto(APPOINTMENT_URL, {
-			waitUntil: "domcontentloaded",
-			timeout: 60000,
-		})
+		try {
+			await page.goto(APPOINTMENT_URL, {
+				waitUntil: "domcontentloaded",
+				timeout: 90000, // Increased timeout for slow networks
+			})
+			if (DEBUG) {
+				console.log("[DEBUG] Navigation successful with domcontentloaded")
+			}
+		} catch (error) {
+			if (DEBUG) {
+				console.log(
+					`[DEBUG] Navigation error: ${error.message}, trying without waiting...`
+				)
+			}
+			// If navigation times out, try again with commit wait
+			await page.goto(APPOINTMENT_URL, {
+				waitUntil: "commit",
+				timeout: 90000,
+			})
+			if (DEBUG) {
+				console.log("[DEBUG] Navigation successful with commit")
+			}
+		}
 
 		// Wait for dynamic content to load
-		await page.waitForTimeout(2000)
+		await page.waitForTimeout(3000)
 
 		// Step 2: Check for and solve captcha if present
 		// Captcha is in a div with background-image containing base64 data
