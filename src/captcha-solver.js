@@ -24,7 +24,7 @@ export async function solveCaptcha(imageBase64, mediaType = "image/png") {
 
 	try {
 		const message = await anthropic.messages.create({
-			model: "claude-sonnet-4-5",
+			model: "claude-opus-4-5",
 			max_tokens: 1024,
 			messages: [
 				{
