@@ -15,17 +15,43 @@ const DEBUG = process.env.DEBUG === "true"
 export async function checkAppointments() {
 	const browser = await chromium.launch({
 		headless: HEADLESS,
+		args: [
+			"--disable-blink-features=AutomationControlled", // Hide automation
+			"--no-sandbox",
+			"--disable-setuid-sandbox",
+		],
 	})
 
 	try {
 		const page = await browser.newPage()
+
+		// Set a realistic user agent
+		await page.setExtraHTTPHeaders({
+			"User-Agent":
+				"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+			"Accept-Language": "en-US,en;q=0.9",
+		})
+
+		// Override navigator.webdriver
+		await page.addInitScript(() => {
+			Object.defineProperty(navigator, "webdriver", {
+				get: () => undefined,
+			})
+		})
 
 		if (DEBUG) {
 			console.log(`[DEBUG] Navigating to: ${APPOINTMENT_URL}`)
 		}
 
 		// Step 1: Navigate to the appointment page
-		await page.goto(APPOINTMENT_URL, { waitUntil: "networkidle" })
+		// Use 'domcontentloaded' instead of 'networkidle' for better reliability
+		await page.goto(APPOINTMENT_URL, {
+			waitUntil: "domcontentloaded",
+			timeout: 60000,
+		})
+
+		// Wait for dynamic content to load
+		await page.waitForTimeout(2000)
 
 		// Step 2: Check for and solve captcha if present
 		// Captcha is in a div with background-image containing base64 data
@@ -197,7 +223,10 @@ async function solveCaptchaAndSubmit(page) {
 		}
 
 		// Wait for navigation after submitting captcha
-		await page.waitForLoadState("networkidle")
+		await page.waitForLoadState("domcontentloaded", { timeout: 30000 })
+
+		// Wait a bit more for dynamic content
+		await page.waitForTimeout(2000)
 
 		// Check if we're still on the captcha page (indicates failure)
 		const stillOnCaptchaPage =
@@ -255,8 +284,17 @@ async function checkPageForAvailability(page) {
 	if (!onAppointmentsPage) {
 		if (DEBUG) {
 			console.log("[DEBUG] Not on appointments page - unexpected page state")
+			// Get current URL and page title for debugging
+			const url = page.url()
+			const title = await page.title()
+			console.log(`[DEBUG] Current URL: ${url}`)
+			console.log(`[DEBUG] Page title: ${title}`)
+
+			// Check what we can find on the page
+			const bodyText = await page.locator("body").textContent()
+			console.log(`[DEBUG] Page body (first 500 chars): ${bodyText?.substring(0, 500)}`)
 		}
-		throw new Error("Not on expected appointments page")
+		throw new Error("Not on expected appointments page - check debug logs for details")
 	}
 
 	// If the H2 is NOT found, appointments might be available
@@ -304,7 +342,10 @@ async function checkNextMonth(page) {
 	}
 
 	// Wait for the page to load
-	await page.waitForLoadState("networkidle")
+	await page.waitForLoadState("domcontentloaded", { timeout: 30000 })
+
+	// Wait a bit for dynamic content
+	await page.waitForTimeout(2000)
 
 	// Check availability on the new page
 	return await checkPageForAvailability(page)
