@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "start": "node src/index.js",
-    "test:notify": "node src/test-notify.js"
+    "test:notify": "node src/test-notify.js",
+    "test:captcha": "node src/test-captcha.js",
+    "capture:captcha": "node src/capture-captcha.js"
   },
   "keywords": [],
   "author": "",
