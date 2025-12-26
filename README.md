@@ -8,6 +8,7 @@ Automated monitoring tool that checks the German Consulate NYC passport appointm
 - 🧩 **Automatic captcha solving** using CapSolver API
 - ⏰ **Time-based scheduling** - more frequent checks during peak release windows (midnight Germany time)
 - 📱 **Instant push notifications** via ntfy.sh when appointments become available
+- 💬 **SMS alerts** (optional) via TextBelt for critical notifications
 - 🛡️ **Robust error handling** - continues running even if individual checks fail
 - 🎭 **Stealth-friendly** - randomized intervals and realistic browser behavior
 
@@ -18,6 +19,7 @@ Automated monitoring tool that checks the German Consulate NYC passport appointm
 - **curl** command-line tool (usually pre-installed)
 - **CapSolver API key** - Sign up at [capsolver.com](https://capsolver.com)
 - **ntfy.sh topic** - Choose a unique topic name for notifications
+- **TextBelt API key** (optional) - For SMS notifications, sign up at [textbelt.com](https://textbelt.com)
 
 ## Setup
 
@@ -54,6 +56,11 @@ APPOINTMENT_URL=https://service2.diplo.de/rktermin/extern/appointment_showMonth.
 # Optional
 HEADLESS=true    # Set to false to see browser
 DEBUG=false      # Set to true for verbose logging
+
+# SMS notifications (optional)
+SMS_PHONE_NUMBER=5551234567              # Single phone number
+SMS_PHONE_NUMBERS=5551234567,5559876543  # Or multiple (comma-separated)
+TEXTBELT_API_KEY=textbelt                # Use "textbelt" for 1 free SMS/day, or get a paid key
 
 # Proxy (optional - use if your server's IP is blocked)
 PROXY_SERVER=    # Example: socks5://localhost:9050 or http://user:pass@proxy:port
@@ -143,8 +150,9 @@ pm2 stop consulate-checker
    - Checks for "no appointments" message
    - Checks both current month and next month
 
-3. **Notifications** (`src/notify.js`):
-   - Sends urgent push notification when appointments are found
+3. **Notifications** (`src/notify.js`, `src/notify-sms.js`):
+   - Sends urgent push notification via ntfy.sh when appointments are found
+   - Optionally sends SMS via TextBelt if phone number is configured
    - Sends error notifications on failures
    - Uses curl to avoid Node.js network issues
 
@@ -157,10 +165,12 @@ app/
 │   ├── checker.js                 # Playwright browser automation
 │   ├── captcha-solver-capsolver.js # CapSolver API integration
 │   ├── captcha-solver.js          # Claude Vision API (backup)
-│   ├── notify.js                  # ntfy.sh notifications
+│   ├── notify.js                  # ntfy.sh push notifications
+│   ├── notify-sms.js              # TextBelt SMS notifications
+│   ├── notify-all.js              # Unified notification sender
 │   ├── test-checker.js            # Test the checker
 │   ├── test-captcha.js            # Test captcha solving
-│   ├── test-notify.js             # Test notifications
+│   ├── test-notify.js             # Test notifications (ntfy + SMS)
 │   └── capture-captcha.js         # Capture real captchas for testing
 ├── .env                           # Configuration (gitignored)
 ├── .env.example                   # Configuration template
@@ -229,6 +239,8 @@ You should see in the debug output:
 
 ### Notifications not working
 
+**For ntfy.sh push notifications:**
+
 1. Test curl directly:
    ```bash
    curl -d "Test message" ntfy.sh/your-topic-name
@@ -237,6 +249,23 @@ You should see in the debug output:
 2. Make sure your `NTFY_TOPIC` in `.env` is set correctly
 
 3. Check you're subscribed to the topic in the ntfy app/web
+
+**For SMS notifications:**
+
+1. Make sure `SMS_PHONE_NUMBER` or `SMS_PHONE_NUMBERS` is set in `.env`
+   - Single number: `SMS_PHONE_NUMBER=5551234567`
+   - Multiple numbers: `SMS_PHONE_NUMBERS=5551234567,5559876543,+15551112222`
+
+2. Test with the free tier first (uses `TEXTBELT_API_KEY=textbelt`)
+   - Free tier: 1 SMS per day per phone number
+   - For unlimited SMS, get a paid key from [textbelt.com](https://textbelt.com)
+
+3. Check TextBelt quota:
+   ```bash
+   curl https://textbelt.com/quota/textbelt
+   ```
+
+4. Note: When appointments are found, SMS is sent to ALL configured phone numbers
 
 ### Captcha solving failures
 
