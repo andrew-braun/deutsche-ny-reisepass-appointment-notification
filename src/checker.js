@@ -108,7 +108,7 @@ export async function checkAppointments() {
 		try {
 			await page.goto(APPOINTMENT_URL, {
 				waitUntil: "domcontentloaded",
-				timeout: 90000, // Increased timeout for slow networks
+				timeout: 30000, // Increased timeout for slow networks
 			})
 			if (DEBUG) {
 				console.log("[DEBUG] Navigation successful with domcontentloaded")
