@@ -65,6 +65,17 @@ export async function checkAppointments() {
 		const context = await browser.newContext(contextOptions)
 		const page = await context.newPage()
 
+		// Block unnecessary resources to speed up loading through proxy
+		await page.route("**/*", (route) => {
+			const resourceType = route.request().resourceType()
+			// Block images, fonts, and stylesheets to save bandwidth
+			if (["image", "font", "stylesheet"].includes(resourceType)) {
+				route.abort()
+			} else {
+				route.continue()
+			}
+		})
+
 		// Set viewport
 		await page.setViewportSize({ width: 1280, height: 720 })
 
@@ -104,33 +115,20 @@ export async function checkAppointments() {
 		}
 
 		// Step 1: Navigate to the appointment page
-		// Use 'domcontentloaded' instead of 'networkidle' for better reliability
-		try {
-			await page.goto(APPOINTMENT_URL, {
-				waitUntil: "domcontentloaded",
-				timeout: 30000, // Increased timeout for slow networks
-			})
-			if (DEBUG) {
-				console.log("[DEBUG] Navigation successful with domcontentloaded")
-			}
-		} catch (error) {
-			if (DEBUG) {
-				console.log(
-					`[DEBUG] Navigation error: ${error.message}, trying without waiting...`
-				)
-			}
-			// If navigation times out, try again with commit wait
-			await page.goto(APPOINTMENT_URL, {
-				waitUntil: "commit",
-				timeout: 30000,
-			})
-			if (DEBUG) {
-				console.log("[DEBUG] Navigation successful with commit")
-			}
+		// Use 'commit' for faster initial load, then wait for specific elements
+		await page.goto(APPOINTMENT_URL, {
+			waitUntil: "commit",
+			timeout: 20000, // Reduced timeout
+		})
+		if (DEBUG) {
+			console.log("[DEBUG] Navigation successful")
 		}
 
-		// Wait for dynamic content to load
-		await page.waitForTimeout(3000)
+		// Wait for the page body to be present (faster than arbitrary timeout)
+		await page.waitForSelector("body", { timeout: 10000 })
+
+		// Small delay for any dynamic content
+		await page.waitForTimeout(1500)
 
 		// Step 2: Check for and solve captcha if present
 		// Captcha is in a div with background-image containing base64 data
@@ -281,8 +279,8 @@ async function solveCaptchaAndSubmit(page) {
 		await captchaInput.clear()
 		await captchaInput.fill(captchaText)
 
-		// Wait a moment to ensure the text is filled
-		await page.waitForTimeout(500)
+		// Wait a brief moment to ensure the text is filled
+		await page.waitForTimeout(1500)
 
 		if (DEBUG) {
 			const filledValue = await captchaInput.inputValue()
@@ -302,10 +300,10 @@ async function solveCaptchaAndSubmit(page) {
 		}
 
 		// Wait for navigation after submitting captcha
-		await page.waitForLoadState("domcontentloaded", { timeout: 30000 })
+		await page.waitForLoadState("commit", { timeout: 15000 })
 
-		// Wait a bit more for dynamic content
-		await page.waitForTimeout(2000)
+		// Wait for dynamic content
+		await page.waitForTimeout(1500)
 
 		// Check if we're still on the captcha page (indicates failure)
 		const stillOnCaptchaPage =
@@ -425,10 +423,10 @@ async function checkNextMonth(page) {
 	}
 
 	// Wait for the page to load
-	await page.waitForLoadState("domcontentloaded", { timeout: 30000 })
+	await page.waitForLoadState("commit", { timeout: 15000 })
 
-	// Wait a bit for dynamic content
-	await page.waitForTimeout(2000)
+	// Wait for dynamic content
+	await page.waitForTimeout(1500)
 
 	// Check availability on the new page
 	return await checkPageForAvailability(page)
