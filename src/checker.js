@@ -7,13 +7,14 @@ dotenv.config()
 const APPOINTMENT_URL = process.env.APPOINTMENT_URL
 const HEADLESS = process.env.HEADLESS !== "false"
 const DEBUG = process.env.DEBUG === "true"
+const PROXY_SERVER = process.env.PROXY_SERVER || null
 
 /**
  * Check for appointment availability
  * @returns {Promise<{available: boolean, message: string, screenshot?: string}>}
  */
 export async function checkAppointments() {
-	const browser = await chromium.launch({
+	const launchOptions = {
 		headless: HEADLESS,
 		args: [
 			"--disable-blink-features=AutomationControlled",
@@ -23,10 +24,42 @@ export async function checkAppointments() {
 			"--disable-gpu",
 			"--disable-software-rasterizer",
 		],
-	})
+	}
+
+	// Add proxy configuration if provided
+	if (PROXY_SERVER) {
+		// Parse proxy URL to extract credentials
+		const proxyUrl = new URL(PROXY_SERVER)
+
+		launchOptions.proxy = {
+			server: `${proxyUrl.protocol}//${proxyUrl.host}`,
+		}
+
+		// Add credentials if present in the URL
+		if (proxyUrl.username && proxyUrl.password) {
+			launchOptions.proxy.username = proxyUrl.username
+			launchOptions.proxy.password = proxyUrl.password
+		}
+
+		// Ignore SSL certificate errors (needed for BrightData and similar proxies)
+		launchOptions.ignoreHTTPSErrors = true
+		if (DEBUG) {
+			console.log(`[DEBUG] Using proxy: ${proxyUrl.protocol}//${proxyUrl.host}`)
+			console.log(`[DEBUG] Proxy credentials configured: ${proxyUrl.username ? 'Yes' : 'No'}`)
+		}
+	}
+
+	const browser = await chromium.launch(launchOptions)
 
 	try {
-		const page = await browser.newPage()
+		// Create context with ignoreHTTPSErrors if using proxy
+		const contextOptions = {}
+		if (PROXY_SERVER) {
+			contextOptions.ignoreHTTPSErrors = true
+		}
+
+		const context = await browser.newContext(contextOptions)
+		const page = await context.newPage()
 
 		// Set viewport
 		await page.setViewportSize({ width: 1280, height: 720 })

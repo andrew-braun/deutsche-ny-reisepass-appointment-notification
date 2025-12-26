@@ -54,7 +54,12 @@ APPOINTMENT_URL=https://service2.diplo.de/rktermin/extern/appointment_showMonth.
 # Optional
 HEADLESS=true    # Set to false to see browser
 DEBUG=false      # Set to true for verbose logging
+
+# Proxy (optional - use if your server's IP is blocked)
+PROXY_SERVER=    # Example: socks5://localhost:9050 or http://user:pass@proxy:port
 ```
+
+**Note on Proxies**: If your server's IP is blocked by the German consulate website (connection timeouts), you'll need to route traffic through a proxy. See the "Proxy Configuration" section below.
 
 4. **Test notifications:**
 
@@ -163,6 +168,63 @@ app/
 └── README.md
 ```
 
+## Proxy Configuration
+
+If your server's IP address or datacenter is blocked by the German consulate website (you'll see connection timeouts), you need to route traffic through a proxy.
+
+### Option 1: SSH Tunnel (FREE - Recommended)
+
+If the checker works on your local machine, tunnel traffic through it:
+
+**On your local machine** (where it works):
+
+```bash
+# Install and keep this running
+ssh -R 9050:localhost:9050 root@your-server-ip -N
+```
+
+**On your server**, add to `.env`:
+
+```env
+PROXY_SERVER=socks5://localhost:9050
+```
+
+This creates a reverse SSH tunnel that routes all Playwright traffic through your local machine's network connection.
+
+### Option 2: Commercial Proxy Service
+
+Use a residential proxy service to avoid IP blocking:
+
+1. **WebShare.io** (Budget option - ~$3/month)
+   - Sign up at [webshare.io](https://www.webshare.io)
+   - Get proxy credentials
+   - Add to `.env`: `PROXY_SERVER=http://username:password@proxy.webshare.io:port`
+
+2. **BrightData** (Premium - better reliability)
+   - Sign up at [brightdata.com](https://brightdata.com)
+   - Use residential proxies for best results
+   - Add to `.env`: `PROXY_SERVER=http://username:password@brd.superproxy.io:port`
+
+3. **Oxylabs** (Enterprise)
+   - Similar to BrightData
+   - Add to `.env`: `PROXY_SERVER=http://username:password@proxy.oxylabs.io:port`
+
+### Testing Proxy Connection
+
+After configuring a proxy, test that it works:
+
+```bash
+DEBUG=true pnpm test:checker
+```
+
+You should see in the debug output:
+
+```text
+[DEBUG] Using proxy: socks5://localhost:9050
+[DEBUG] Request: GET https://service2.diplo.de/...
+[DEBUG] Response: 200 https://service2.diplo.de/...
+```
+
 ## Troubleshooting
 
 ### Notifications not working
@@ -187,6 +249,23 @@ app/
 - Set `HEADLESS=false DEBUG=true` to see what's happening
 - Make sure you have enough RAM (Chromium needs ~500MB per instance)
 - Check Playwright installation: `pnpm exec playwright install chromium`
+
+### Connection timeouts / IP blocking
+
+**Symptoms**: `Failed to connect to service2.diplo.de port 443` or `Connection timed out`
+
+**Cause**: The German consulate website blocks certain datacenter IPs (Linode, AWS, etc.) to prevent bots
+
+**Solution**: Configure a proxy - see the "Proxy Configuration" section above. The FREE SSH tunnel option works great if the checker runs successfully on your local machine.
+
+**Quick test**:
+
+```bash
+# On your server, test if you can reach the site
+curl -I 'https://service2.diplo.de/rktermin/extern/appointment_showMonth.do?locationCode=newy&realmId=683&categoryId=2673'
+
+# If this times out, you need a proxy
+```
 
 ### High CapSolver costs
 
