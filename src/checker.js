@@ -45,7 +45,11 @@ export async function checkAppointments() {
 		launchOptions.ignoreHTTPSErrors = true
 		if (DEBUG) {
 			console.log(`[DEBUG] Using proxy: ${proxyUrl.protocol}//${proxyUrl.host}`)
-			console.log(`[DEBUG] Proxy credentials configured: ${proxyUrl.username ? 'Yes' : 'No'}`)
+			console.log(
+				`[DEBUG] Proxy credentials configured: ${
+					proxyUrl.username ? "Yes" : "No"
+				}`
+			)
 		}
 	}
 
@@ -84,13 +88,13 @@ export async function checkAppointments() {
 				console.log(`[DEBUG] Request: ${request.method()} ${request.url()}`)
 			})
 			page.on("response", (response) => {
-				console.log(
-					`[DEBUG] Response: ${response.status()} ${response.url()}`
-				)
+				console.log(`[DEBUG] Response: ${response.status()} ${response.url()}`)
 			})
 			page.on("requestfailed", (request) => {
 				console.log(
-					`[DEBUG] Request failed: ${request.url()} - ${request.failure()?.errorText}`
+					`[DEBUG] Request failed: ${request.url()} - ${
+						request.failure()?.errorText
+					}`
 				)
 			})
 		}
@@ -118,7 +122,7 @@ export async function checkAppointments() {
 			// If navigation times out, try again with commit wait
 			await page.goto(APPOINTMENT_URL, {
 				waitUntil: "commit",
-				timeout: 90000,
+				timeout: 30000,
 			})
 			if (DEBUG) {
 				console.log("[DEBUG] Navigation successful with commit")
@@ -367,9 +371,13 @@ async function checkPageForAvailability(page) {
 
 			// Check what we can find on the page
 			const bodyText = await page.locator("body").textContent()
-			console.log(`[DEBUG] Page body (first 500 chars): ${bodyText?.substring(0, 500)}`)
+			console.log(
+				`[DEBUG] Page body (first 500 chars): ${bodyText?.substring(0, 500)}`
+			)
 		}
-		throw new Error("Not on expected appointments page - check debug logs for details")
+		throw new Error(
+			"Not on expected appointments page - check debug logs for details"
+		)
 	}
 
 	// If the H2 is NOT found, appointments might be available
