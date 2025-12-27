@@ -84,14 +84,23 @@ export async function sendSMS(phone, message, options = {}) {
 function getPhoneNumbers() {
 	const phones = []
 
-	// Support legacy SMS_PHONE_NUMBER (single number)
-	if (process.env.SMS_PHONE_NUMBER) {
-		phones.push(process.env.SMS_PHONE_NUMBER.trim())
-	}
-
 	// Support new SMS_PHONE_NUMBERS (comma-separated)
 	if (process.env.SMS_PHONE_NUMBERS) {
 		const numbers = process.env.SMS_PHONE_NUMBERS.split(",")
+			.map((num) => num.trim())
+			.filter((num) => num.length > 0)
+		phones.push(...numbers)
+	}
+
+	// Remove duplicates
+	return [...new Set(phones)]
+}
+
+function getErrorPhoneNumbers() {
+	const phones = []
+
+	if (process.env.ERROR_PHONE_NUMBERS) {
+		const numbers = process.env.ERROR_PHONE_NUMBERS.split(",")
 			.map((num) => num.trim())
 			.filter((num) => num.length > 0)
 		phones.push(...numbers)
@@ -162,7 +171,7 @@ export async function smsError(phone, errorMessage) {
 		actualMessage = errorMessage
 	} else {
 		// phone is actually the error message (new API)
-		phones = getPhoneNumbers()
+		phones = getErrorPhoneNumbers()
 		actualMessage = typeof phone === "string" ? phone : errorMessage
 	}
 
