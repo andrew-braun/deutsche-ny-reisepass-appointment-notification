@@ -19,7 +19,7 @@ const NTFY_BASE_URL = "https://ntfy.sh"
  * @param {string[]} options.tags - Emoji tags (e.g., ['warning', 'skull'])
  */
 export async function notify(message, options = {}) {
-	const topic = process.env.NTFY_TOPIC
+	const topic = options.topic || process.env.NTFY_TOPIC
 
 	if (!topic) {
 		throw new Error("NTFY_TOPIC environment variable is not set")
@@ -71,5 +71,6 @@ export async function notifyError(errorMessage) {
 		title: "Consulate Checker Error",
 		priority: "high",
 		tags: ["warning"],
+		topic: process.env.NTFY_ERROR_TOPIC || process.env.NTFY_TOPIC,
 	})
 }

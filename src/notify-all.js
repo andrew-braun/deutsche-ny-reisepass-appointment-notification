@@ -3,8 +3,8 @@
  * Sends notifications to all configured channels (ntfy + SMS)
  */
 
-import { notifyAvailability, notifyError } from "./notify.js"
 import { smsAvailability, smsError } from "./notify-sms.js"
+import { notifyAvailability, notifyError } from "./notify.js"
 
 /**
  * Send availability alert to all configured channels
@@ -64,16 +64,16 @@ export async function alertError(errorMessage) {
 	}
 
 	// Send SMS if phone numbers are configured
-	const hasPhoneNumbers =
-		process.env.SMS_PHONE_NUMBER || process.env.SMS_PHONE_NUMBERS
-	if (hasPhoneNumbers) {
-		try {
-			await smsError(errorMessage)
-			results.push("SMS")
-		} catch (err) {
-			errors.push(`SMS: ${err.message}`)
-		}
-	}
+	// const hasPhoneNumbers =
+	// 	process.env.SMS_PHONE_NUMBER || process.env.SMS_PHONE_NUMBERS
+	// if (hasPhoneNumbers) {
+	// 	try {
+	// 		await smsError(errorMessage)
+	// 		results.push("SMS")
+	// 	} catch (err) {
+	// 		errors.push(`SMS: ${err.message}`)
+	// 	}
+	// }
 
 	// Log results
 	if (results.length > 0) {
