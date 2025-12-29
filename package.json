@@ -6,6 +6,8 @@
   "scripts": {
     "start": "node src/index.js",
     "test:notify": "node src/test-notify.js",
+    "test:notify:ntfy": "node src/test-notify.js ntfy",
+    "test:notify:sms": "node src/test-notify.js sms",
     "test:captcha": "node src/test-captcha.js",
     "test:checker": "node src/test-checker.js",
     "capture:captcha": "node src/capture-captcha.js"
